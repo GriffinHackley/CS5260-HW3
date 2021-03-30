@@ -90,7 +90,6 @@ client = boto3.client('s3')
 if len(sys.argv) <= 1:
     #if no arguments
     source = 'usu-cs5260-hackley-requests'
-    # requests = s3.Bucket(source)
     whereTo = 'usu-cs5260-hackley-web'
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('widgets')
@@ -105,13 +104,11 @@ else :
     #get input type
     if sys.argv[2] == 'sqs':
         sqs = boto3.client('sqs')
-        sqsUrl = 'https://sqs.us-east-1.amazonaws.com/912483513202/cs5260-requests'
-        source = sys.argv[1]
+        sqsUrl = sys.argv[1]
         sourceType = 0
 
     if sys.argv[2] == 'bucket':
         source = sys.argv[1]
-        # requests = s3.Bucket(source)
         sourceType = 1
 
     if sys.argv[3] == "db":
