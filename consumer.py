@@ -27,8 +27,6 @@ def readFromBucket(s3, client, bucket):
     return (key,json.loads(body))
 
 def getWidgetFromSQS(sqs, url):
-    # message = queue.receive_messages()
-    # print(message['Messages'])
     queue_url = 'https://sqs.us-east-1.amazonaws.com/912483513202/cs5260-requests'
     response = sqs.receive_message(
         QueueUrl=queue_url,
@@ -45,10 +43,11 @@ def getWidgetFromSQS(sqs, url):
     message = response['Messages'][0]
     receipt_handle = message['ReceiptHandle']
     final = json.loads(message['Body'])
+    # print(response)
 
     sqs.delete_message(QueueUrl=queue_url,ReceiptHandle=receipt_handle)
     logging.warning('Widget recieved from SQS')
-    return (final[0],final[1])
+    return (1,final)
 
 def writeToS3(s3, key, data, bucket):
     name = data["owner"]
@@ -75,7 +74,7 @@ def deleteFromS3(s3, whereTo, key):
             obj.delete()
             logging.warning('item deleted from S3')
 
-def delteFromDB(table, data):
+def deleteFromDB(table, data):
     table.delete_item(Key = {'widgetId':data['widgetId'], 'owner':data['owner']})
     logging.warning('item deleted from database')
 
@@ -98,7 +97,7 @@ if len(sys.argv) <= 1:
 
     #choose source and storage types
     storage = 1
-    sourceType = 1
+    sourceType = 0
 
 else :
     #get input type
@@ -160,9 +159,11 @@ while keepGoing < 10:
             if storage == 1:
                 deleteFromS3(s3, whereTo, key)
             elif storage == 0:
-                delteFromDB(table, data)
+                deleteFromDB(table, data)
 
         elif request == "update":
+            if storage == 1:
+                writeToS3(s3,key,data,whereTo)
             print("This was an update request")
 
         else :
