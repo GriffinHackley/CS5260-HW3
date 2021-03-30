@@ -4,34 +4,22 @@ import sys
 import time
 import logging
 
-def readFromBucket(requests):
+def readFromBucket(s3, client, bucket):
     #get all files from the bucket
-
-    #TODO: dont need to get all objects, just get one, it will be the lowest key value
-    #get_object requires a key, in order to know what the lowest key is, i need all the objects in the bucket
-    print(requests.list_objects())
-    allRequests = requests.objects.all()
-
-    size = sum(1 for _ in allRequests)
-
-    print(size)
-
-    if size == 0:
+    response = client.list_objects(Bucket=bucket, MaxKeys=1)
+    try:
+        key = response['Contents'][0]['Key']
+    #if no objects in bucket then return 0
+    except Exception as e:
+        print("No more objects")
         return 0
-
-    #get lowest keyed object from the bucket
-    lowest = next(x for x in allRequests)
-    for obj in allRequests:
-        if lowest.key > obj.key:
-            lowest = obj
     
-    # get information from file into JSON format
-    body = lowest.get()['Body'].read()
+    obj = s3.Object(bucket, key)
+    body = obj.get()['Body'].read()
 
     #delete object from bucket
-    key = lowest.key
-    lowest.delete()
-    logging.warning("Object deleted from: " + requests.name)
+    obj.delete()
+    logging.warning("Object deleted from: " + bucket)
 
     if len(body) < 4:
         return -1
@@ -102,14 +90,16 @@ client = boto3.client('s3')
 if len(sys.argv) <= 1:
     #if no arguments
     source = 'usu-cs5260-hackley-requests'
-    requests = client.Bucket(source)
+    # requests = s3.Bucket(source)
     whereTo = 'usu-cs5260-hackley-web'
-    storage = 0
-    sourceType = 1
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('widgets')
-    # sqs = boto3.client('sqs')
-    # sqsUrl = 'https://sqs.us-east-1.amazonaws.com/912483513202/cs5260-requests'
+    sqs = boto3.client('sqs')
+    sqsUrl = 'https://sqs.us-east-1.amazonaws.com/912483513202/cs5260-requests'
+
+    #choose source and storage types
+    storage = 1
+    sourceType = 1
 
 else :
     #get input type
@@ -121,7 +111,7 @@ else :
 
     if sys.argv[2] == 'bucket':
         source = sys.argv[1]
-        requests = client.Bucket(source)
+        # requests = s3.Bucket(source)
         sourceType = 1
 
     if sys.argv[3] == "db":
@@ -138,10 +128,11 @@ update = 0
 create = 0
 delete = 0
 
-while keepGoing < 1:
+while keepGoing < 10:
     #read the file and return the json object and key
     if sourceType == 1:
-        info = readFromBucket(requests)
+        info = readFromBucket(s3, client, source)
+        keepGoing = keepGoing+1
     elif sourceType == 0:
         info = getWidgetFromSQS(sqs, sqsUrl)
     
@@ -151,7 +142,6 @@ while keepGoing < 1:
 
     elif info == 0:
         #try 10 times, after that end program
-        keepGoing = keepGoing+1
         print("Out of files to read")
         print("Waiting...")
         time.sleep(.1)
